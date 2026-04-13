@@ -21,7 +21,7 @@ public class UIButtonSoundManager : MonoBehaviour
 
     public void SetupAllButtons()
     {
-        Button[] buttons = FindObjectsOfType<Button>(true); // true = include inactive
+        Button[] buttons = FindObjectsByType<Button>(FindObjectsInactive.Include, FindObjectsSortMode.None);
 
         foreach (Button btn in buttons)
         {

@@ -10,6 +10,9 @@ public class NameInputUI : MonoBehaviour
     public TextMeshProUGUI statusText;
 
     private PlayerController localPlayer;
+    [Header("AUDIO")]
+[SerializeField] private AudioSource bgmSource;
+[SerializeField] private AudioClip bgmClip;
 
     void Start()
     {
@@ -19,22 +22,22 @@ public class NameInputUI : MonoBehaviour
             statusText.text = "Đang kết nối server...";
     }
 
-    [System.Obsolete]
     void Update()
     {
-        // tìm player
+        // 🔥 tìm player (FIX API Unity 6)
         if (localPlayer == null)
         {
-            foreach (var p in FindObjectsOfType<PlayerController>())
+            var players = FindObjectsByType<PlayerController>(FindObjectsSortMode.None);
+
+            foreach (var p in players)
             {
-                if (p.Object.HasInputAuthority)
+                if (p.Object != null && p.Object.HasInputAuthority)
                 {
                     localPlayer = p;
                     localPlayer.SetControl(false);
 
                     Debug.Log("FOUND LOCAL PLAYER");
 
-                    // ✅ cập nhật UI
                     if (statusText != null)
                         statusText.text = "Đã kết nối! Nhập tên của bạn";
 
@@ -44,7 +47,6 @@ public class NameInputUI : MonoBehaviour
         }
     }
 
-    [System.Obsolete]
     public void OnConfirm()
 {
     if (localPlayer == null)
@@ -63,13 +65,24 @@ public class NameInputUI : MonoBehaviour
         return;
     }
 
-    // 🔥 LƯU NAME
+    // 🔥 LƯU LOCAL
     PlayerPrefs.SetString("PlayerName", name);
 
+    // 🔥 GAME MULTIPLAYER (GIỮ NGUYÊN)
     localPlayer.SetPlayerName(name);
     localPlayer.RPC_SetName(name);
 
+    // 🔥 👇 THÊM DÒNG NÀY (QUAN TRỌNG NHẤT)
+    PlayFabManager.Instance.SetPlayerName(name);
+
     localPlayer.SetControl(true);
+    // 🔥 PHÁT NHẠC NỀN
+if (bgmSource != null && bgmClip != null)
+{
+    bgmSource.clip = bgmClip;
+    bgmSource.loop = true;
+    bgmSource.Play();
+}   
 
     panel.SetActive(false);
 }

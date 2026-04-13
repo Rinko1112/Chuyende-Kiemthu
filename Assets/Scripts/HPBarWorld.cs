@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 using Fusion;
 
 public class HPBarWorld : MonoBehaviour
@@ -8,12 +9,16 @@ public class HPBarWorld : MonoBehaviour
     public Slider staminaSlider;
     public Transform target;
 
+    [Header("NAME")]
+    [SerializeField] private TextMeshProUGUI nameText;
+
     [Header("HOST ICON")]
     public GameObject hostIcon;
 
     private Camera cam;
     private PlayerStats stats;
     private NetworkObject netObj;
+    private PlayerController controller;
 
     private float smoothSpeed = 10f;
 
@@ -25,6 +30,7 @@ public class HPBarWorld : MonoBehaviour
         {
             stats = target.GetComponent<PlayerStats>();
             netObj = target.GetComponent<NetworkObject>();
+            controller = target.GetComponent<PlayerController>();
         }
 
         slider.maxValue = 100;
@@ -52,9 +58,11 @@ public class HPBarWorld : MonoBehaviour
             return;
         }
 
-        transform.position = target.position + Vector3.up * 2f;
+        // ===== FOLLOW =====
+        transform.position = target.position + Vector3.up * 2.5f;
         transform.forward = cam.transform.forward;
 
+        // ===== HP / STAMINA =====
         if (stats != null)
         {
             slider.value = Mathf.Lerp(
@@ -76,6 +84,12 @@ public class HPBarWorld : MonoBehaviour
             {
                 Destroy(gameObject);
             }
+        }
+
+        // ===== NAME (GỘP TẠI ĐÂY) =====
+        if (controller != null && nameText != null)
+        {
+            nameText.text = controller.GetPlayerName();
         }
     }
 }

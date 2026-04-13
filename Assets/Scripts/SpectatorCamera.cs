@@ -11,10 +11,12 @@ public class SpectatorCamera : MonoBehaviour
     [SerializeField] private Vector3 offset = new Vector3(0, 10, -5);
 
     [Header("SMOOTH SETTINGS")]
-    [SerializeField] private float smoothTime = 0.15f;
-    [SerializeField] private float rotationSpeed = 10f;
+    [SerializeField] private float smoothTime = 0.2f;
 
-    private Vector3 velocity; // dùng cho SmoothDamp
+    private Vector3 velocity;
+
+    [Header("FIXED ROTATION")]
+    [SerializeField] private Vector3 fixedRotation = new Vector3(60f, 0f, 0f); // 🔥 góc cố định
 
     void Awake()
     {
@@ -37,25 +39,24 @@ public class SpectatorCamera : MonoBehaviour
     }
 
     public void ActivateSpectator()
-{
-    // 🔥 remove player chết khỏi list
-    players.RemoveAll(p => p == null);
+    {
+        players.RemoveAll(p => p == null);
 
-    if (players.Count == 0) return;
+        if (players.Count == 0) return;
 
-    currentIndex = 0;
-    velocity = Vector3.zero;
-}
+        currentIndex = 0;
+        velocity = Vector3.zero;
+    }
 
-    void LateUpdate() // 🔥 dùng LateUpdate để mượt hơn camera follow
+    void LateUpdate()
     {
         if (players.Count == 0) return;
 
-        // đổi player
+        // ===== SWITCH PLAYER =====
         if (Input.GetKeyDown(KeyCode.RightArrow))
         {
             currentIndex = (currentIndex + 1) % players.Count;
-            velocity = Vector3.zero; // reset khi đổi target
+            velocity = Vector3.zero;
         }
 
         if (Input.GetKeyDown(KeyCode.LeftArrow))
@@ -67,12 +68,11 @@ public class SpectatorCamera : MonoBehaviour
         }
 
         Transform target = players[currentIndex];
-
         if (target == null) return;
 
+        // ===== POSITION =====
         Vector3 desiredPosition = target.position + offset;
 
-        // 🔥 mượt position
         transform.position = Vector3.SmoothDamp(
             transform.position,
             desiredPosition,
@@ -80,18 +80,13 @@ public class SpectatorCamera : MonoBehaviour
             smoothTime
         );
 
-        // 🔥 mượt rotation
-        Quaternion targetRotation = Quaternion.LookRotation(target.position - transform.position);
-        transform.rotation = Quaternion.Slerp(
-            transform.rotation,
-            targetRotation,
-            rotationSpeed * Time.deltaTime
-        );
+        // ===== FIXED ROTATION (KHÔNG RUNG) =====
+        transform.rotation = Quaternion.Euler(fixedRotation);
     }
+
     public void AddPlayer(Transform t)
-{
-    if (!players.Contains(t))
-        players.Add(t);
-}
-    
+    {
+        if (!players.Contains(t))
+            players.Add(t);
+    }
 }

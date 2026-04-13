@@ -13,6 +13,7 @@ public class ChatManager : NetworkBehaviour
     public TMP_InputField inputField;
     public TextMeshProUGUI chatContent;
     public ScrollRect scrollRect;
+    private bool isSpawned = false; 
 
     [Header("Animation")]
     [SerializeField] private float animDuration = 0.2f;
@@ -33,7 +34,6 @@ public class ChatManager : NetworkBehaviour
     private bool isOpening = false;
     private float animTime = 0f;
 
-    // 🎨 màu player
     private Dictionary<string, string> playerColors = new Dictionary<string, string>();
 
     private string[] colorList = new string[]
@@ -45,6 +45,14 @@ public class ChatManager : NetworkBehaviour
         "#00FFAB",
         "#FF9F1C"
     };
+
+    // ================= 🔥 CHAT HISTORY (NEW) =================
+    [Networked, Capacity(50)]
+    private NetworkArray<NetworkString<_128>> ChatHistory => default;
+
+    private string lastHistorySnapshot = "";
+
+    // =======================================================
 
     void Awake()
     {
@@ -61,97 +69,128 @@ public class ChatManager : NetworkBehaviour
 
     [System.Obsolete]
     void Update()
+{
+    if (!isSpawned) return; // 🔥 FIX QUAN TRỌNG
+
+    if (localPlayer == null)
+        localPlayer = PlayerController.Local;
+
+    // ===== ANIMATION =====
+    if (isOpening)
     {
-        if (localPlayer == null)
+        animTime += Time.deltaTime;
+        float t = animTime / animDuration;
+
+        chatPanel.transform.localScale = Vector3.Lerp(Vector3.zero, Vector3.one, t);
+
+        if (t >= 1f)
         {
-            localPlayer = PlayerController.Local;
+            chatPanel.transform.localScale = Vector3.one;
+            isOpening = false;
+        }
+    }
+
+    // ===== ENTER =====
+    if (Input.GetKeyDown(KeyCode.Return))
+    {
+        if (!chatPanel.activeSelf)
+        {
+            OpenChat();
+            return;
         }
 
-        // ===== ANIMATION =====
-        if (isOpening)
+        if (inputField.isFocused)
         {
-            animTime += Time.deltaTime;
-            float t = animTime / animDuration;
+            OnSendButton();
+        }
+        else
+        {
+            inputField.ActivateInputField();
+        }
+    }
 
-            chatPanel.transform.localScale = Vector3.Lerp(Vector3.zero, Vector3.one, t);
+    // ===== ESC =====
+    if (chatPanel.activeSelf && Input.GetKeyDown(KeyCode.Escape))
+    {
+        CloseChat();
+    }
 
-            if (t >= 1f)
+    // 🔥 SAFE CALL
+    UpdateChatFromHistory();
+}
+    public void OnSendButton()
+{
+    if (localPlayer == null) return;
+
+    string msg = inputField.text.Trim();
+    if (string.IsNullOrEmpty(msg)) return;
+
+    string playerName = localPlayer.GetPlayerName();
+
+    RPC_SendChatToState(playerName, msg);
+
+    if (audioSource != null && sendSound != null)
+        audioSource.PlayOneShot(sendSound);
+
+    inputField.text = "";
+    inputField.ActivateInputField();
+}
+
+    // ================= 🔥 STORE HISTORY =================
+    [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+    void RPC_SendChatToState(string playerName, string message)
+    {
+        string full = playerName + "|" + message;
+
+        for (int i = 0; i < ChatHistory.Length; i++)
+        {
+            if (string.IsNullOrEmpty(ChatHistory[i].ToString()))
             {
-                chatPanel.transform.localScale = Vector3.one;
-                isOpening = false;
+                ChatHistory.Set(i, full);
+                return;
             }
         }
 
-        // ===== ENTER =====
-        if (chatPanel.activeSelf && Input.GetKeyDown(KeyCode.Return))
+        // 🔥 nếu đầy → shift lên (giữ 50 tin mới nhất)
+        for (int i = 1; i < ChatHistory.Length; i++)
         {
-            if (inputField.isFocused)
-                SendMessage();
-            else
-                inputField.ActivateInputField();
+            ChatHistory.Set(i - 1, ChatHistory[i]);
         }
 
-        // ===== ESC =====
-        if (chatPanel.activeSelf && Input.GetKeyDown(KeyCode.Escape))
+        ChatHistory.Set(ChatHistory.Length - 1, full);
+    }
+
+    // ================= 🔥 LOAD HISTORY =================
+    void UpdateChatFromHistory()
+    {
+        string snapshot = "";
+
+        for (int i = 0; i < ChatHistory.Length; i++)
         {
-            CloseChat();
+            string entry = ChatHistory[i].ToString();
+            if (string.IsNullOrEmpty(entry)) continue;
+
+            snapshot += entry + "\n";
+        }
+
+        if (snapshot == lastHistorySnapshot) return;
+
+        lastHistorySnapshot = snapshot;
+
+        chatContent.text = "";
+
+        foreach (var line in snapshot.Split('\n'))
+        {
+            if (string.IsNullOrEmpty(line)) continue;
+
+            string[] parts = line.Split('|');
+            if (parts.Length < 2) continue;
+
+            ReceiveMessage(parts[0], parts[1]);
         }
     }
 
-    // ===== OPEN =====
-    public void OpenChat()
-    {
-        chatPanel.SetActive(true);
-
-        if (openChatButton != null)
-            openChatButton.SetActive(false);
-
-        chatPanel.transform.localScale = Vector3.zero;
-        animTime = 0f;
-        isOpening = true;
-
-        inputField.ActivateInputField();
-
-        if (notifyDot != null)
-            notifyDot.SetActive(false);
-
-        if (PlayerController.Local != null)
-            PlayerController.Local.SetControl(false);
-    }
-
-    // ===== CLOSE =====
-    public void CloseChat()
-    {
-        chatPanel.SetActive(false);
-
-        if (openChatButton != null)
-            openChatButton.SetActive(true);
-
-        if (PlayerController.Local != null)
-            PlayerController.Local.SetControl(true);
-    }
-
-    // ===== SEND =====
-    [System.Obsolete]
-    public void SendMessage()
-    {
-        if (localPlayer == null) return;
-
-        string msg = inputField.text.Trim();
-        if (string.IsNullOrEmpty(msg)) return;
-
-        string playerName = localPlayer.GetPlayerName();
-
-        localPlayer.RPC_SendChat(playerName, msg);
-
-        if (audioSource != null && sendSound != null)
-            audioSource.PlayOneShot(sendSound);
-
-        inputField.text = "";
-        inputField.ActivateInputField();
-    }
-
-    // ===== COLOR =====
+    // ================= COLOR =================
     string GetColor(string playerName)
     {
         if (!playerColors.ContainsKey(playerName))
@@ -163,7 +202,7 @@ public class ChatManager : NetworkBehaviour
         return playerColors[playerName];
     }
 
-    // ===== RECEIVE =====
+    // ================= RECEIVE =================
     public void ReceiveMessage(string playerName, string message)
     {
         string color = GetColor(playerName);
@@ -174,16 +213,50 @@ public class ChatManager : NetworkBehaviour
         Canvas.ForceUpdateCanvases();
 
         if (scrollRect != null)
-        {
             scrollRect.verticalNormalizedPosition = 0f;
-        }
 
         if (!chatPanel.activeSelf && notifyDot != null)
-        {
             notifyDot.SetActive(true);
-        }
 
         if (audioSource != null && receiveSound != null)
             audioSource.PlayOneShot(receiveSound);
     }
+
+    // ================= OPEN =================
+    public void OpenChat()
+    {
+        chatPanel.SetActive(true);
+
+        if (openChatButton != null)
+            openChatButton.SetActive(false);
+
+        chatPanel.transform.localScale = Vector3.zero;
+        animTime = 0f;
+        isOpening = true;
+
+        inputField.text = "";
+        inputField.ActivateInputField();
+
+        if (notifyDot != null)
+            notifyDot.SetActive(false);
+
+        if (PlayerController.Local != null)
+            PlayerController.Local.SetControl(false);
+    }
+
+    // ================= CLOSE =================
+    public void CloseChat()
+    {
+        chatPanel.SetActive(false);
+
+        if (openChatButton != null)
+            openChatButton.SetActive(true);
+
+        if (PlayerController.Local != null)
+            PlayerController.Local.SetControl(true);
+    }
+    public override void Spawned()
+{
+    isSpawned = true;
+}
 }

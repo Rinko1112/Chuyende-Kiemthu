@@ -1,6 +1,5 @@
 using Fusion;
 using UnityEngine;
-using UnityEngine.UI;
 
 public class GameManager : NetworkBehaviour
 {
@@ -8,56 +7,69 @@ public class GameManager : NetworkBehaviour
 
     [Networked] public bool IsGameEnded { get; set; }
 
+    [Header("TIMER")]
+    [SerializeField] private float matchDuration = 1800f;
+
+    [Networked] private float StartTime { get; set; }
+    [Networked] private bool IsTimerRunning { get; set; }
+
     void Awake()
     {
         Instance = this;
     }
 
-    [System.Obsolete]
+    public override void Spawned()
+    {
+        if (Object.HasStateAuthority)
+        {
+            IsTimerRunning = false;
+        }
+    }
+
     public override void FixedUpdateNetwork()
     {
         if (!Object.HasStateAuthority) return;
         if (IsGameEnded) return;
 
-        CheckLoseCondition();
-    }
-
-    // ===== LOSE =====
-    [System.Obsolete]
-    void CheckLoseCondition()
-    {
-        var players = FindObjectsOfType<PlayerStats>();
-
-        if (players.Length == 0) return;
-
-        bool allDead = true;
-
-        foreach (var p in players)
+        if (IsTimerRunning)
         {
-            if (p == null) continue;
+            float elapsed = Runner.SimulationTime - StartTime;
 
-            if (p.HP > 0)
+            if (elapsed >= matchDuration)
             {
-                allDead = false;
-                break;
+                TriggerLose();
             }
         }
-
-        if (allDead)
-        {
-            TriggerLose();
-        }
     }
 
-    public void TriggerLose()
+    // ================= TIMER =================
+    public void StartTimer()
     {
-        if (IsGameEnded) return;
+        if (!Object.HasStateAuthority) return;
 
-        IsGameEnded = true;
-
-        RPC_GameLose();
+        StartTime = Runner.SimulationTime;
+        IsTimerRunning = true;
     }
 
+    public int GetElapsedTime()
+    {
+        if (!IsTimerRunning) return 0;
+
+        float elapsed = Runner.SimulationTime - StartTime;
+        return Mathf.RoundToInt(elapsed);
+    }
+
+    public float GetTimeRemaining()
+    {
+        if (!IsTimerRunning) return matchDuration;
+
+        float elapsed = Runner.SimulationTime - StartTime;
+        float remain = matchDuration - elapsed;
+
+        return Mathf.Max(0f, remain);
+    }
+
+    // ================= WIN =================
     public void TriggerWin()
     {
         if (IsGameEnded) return;
@@ -65,23 +77,46 @@ public class GameManager : NetworkBehaviour
         IsGameEnded = true;
 
         RPC_GameWin();
+
+        // 🔥 QUAN TRỌNG: gọi RPC để mọi client tự submit
+        RPC_SubmitScore(GetElapsedTime());
     }
 
+    // ================= LOSE =================
+    void TriggerLose()
+    {
+        if (IsGameEnded) return;
+
+        IsGameEnded = true;
+        Debug.Log("YOU LOSE");
+    }
+
+    // ================= RPC =================
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
-void RPC_GameWin()
-{
-    Debug.Log("YOU WIN");
+    void RPC_GameWin()
+    {
+        Debug.Log("YOU WIN");
+    }
 
-    if (GameUIManager.Instance != null)
-        GameUIManager.Instance.ShowWin();
-}
+    // 🔥 FIX CHÍNH Ở ĐÂY
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    void RPC_SubmitScore(int time)
+    {
+        var players = FindObjectsByType<PlayerStats>(FindObjectsSortMode.None);
 
-[Rpc(RpcSources.StateAuthority, RpcTargets.All)]
-void RPC_GameLose()
-{
-    Debug.Log("YOU LOSE");
+        foreach (var p in players)
+        {
+            if (p == null) continue;
 
-    if (GameUIManager.Instance != null)
-        GameUIManager.Instance.ShowLose();
-}
+            // 🔥 mỗi client chỉ submit CHÍNH NÓ
+            if (p.Object != null && p.Object.HasInputAuthority)
+            {
+                int score = p.Score;
+
+                Debug.Log($"🔥 CLIENT SUBMIT | Score={score} Time={time}");
+
+                PlayFabManager.Instance?.SubmitScore(score, time);
+            }
+        }
+    }
 }

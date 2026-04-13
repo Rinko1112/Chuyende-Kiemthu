@@ -3,7 +3,7 @@ using Fusion;
 
 public class PlayerSpawner : SimulationBehaviour, IPlayerJoined
 {
-    [SerializeField] private GameObject playerPrefab;
+    [SerializeField] private GameObject[] playerPrefabs;
 
     [Header("SPAWN POINT")]
     [SerializeField] private Transform spawnPoint;
@@ -20,7 +20,6 @@ public class PlayerSpawner : SimulationBehaviour, IPlayerJoined
             if (spawnPoint != null)
                 basePos = spawnPoint.position;
 
-            // 🔥 spawn gần checkpoint
             Vector3 offset = new Vector3(
                 Random.Range(-spawnRadius, spawnRadius),
                 0f,
@@ -29,7 +28,11 @@ public class PlayerSpawner : SimulationBehaviour, IPlayerJoined
 
             Vector3 spawnPos = basePos + offset;
 
-            Runner.Spawn(playerPrefab, spawnPos, Quaternion.identity, player);
+            // 🔥 random nhân vật
+            int index = Random.Range(0, playerPrefabs.Length);
+            GameObject chosenPrefab = playerPrefabs[index];
+
+            Runner.Spawn(chosenPrefab, spawnPos, Quaternion.identity, player);
         }
     }
 }

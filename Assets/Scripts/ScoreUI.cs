@@ -25,6 +25,6 @@ public class ScoreUI : MonoBehaviour
             return;
         }
 
-        scoreText.text = "Score: " + localPlayer.Score;
+        scoreText.text = " " + localPlayer.Score;
     }
 }

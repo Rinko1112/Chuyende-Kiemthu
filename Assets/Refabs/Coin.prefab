@@ -13,6 +13,18 @@ PrefabInstance:
       value: Coin
       objectReference: {fileID: 0}
     - target: {fileID: 4603969751776052, guid: de24e9dac65bddc40bc8f81e2245a72c, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 4603969751776052, guid: de24e9dac65bddc40bc8f81e2245a72c, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 4603969751776052, guid: de24e9dac65bddc40bc8f81e2245a72c, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 4603969751776052, guid: de24e9dac65bddc40bc8f81e2245a72c, type: 3}
       propertyPath: m_LocalPosition.x
       value: -5.135802
       objectReference: {fileID: 0}
@@ -66,6 +78,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 1923153190385852, guid: de24e9dac65bddc40bc8f81e2245a72c, type: 3}
       insertIndex: -1
       addedObject: {fileID: 5132793523457062830}
+    - targetCorrespondingSourceObject: {fileID: 1923153190385852, guid: de24e9dac65bddc40bc8f81e2245a72c, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: -8819694022857806693}
   m_SourcePrefab: {fileID: 100100000, guid: de24e9dac65bddc40bc8f81e2245a72c, type: 3}
 --- !u!1 &8543175668386293549 stripped
 GameObject:
@@ -85,6 +100,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   value: 10
+  itemId: Coin
   rotateSpeed: 180
 --- !u!114 &8788805178403039600
 MonoBehaviour:
@@ -104,6 +120,7 @@ MonoBehaviour:
   NestedObjects: []
   NetworkedBehaviours:
   - {fileID: 1877966143414393163}
+  - {fileID: -8819694022857806693}
   ForceRemoteRenderTimeframe: 0
 --- !u!65 &5132793523457062830
 BoxCollider:
@@ -126,3 +143,20 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.76345885, y: 0.91229343, z: 0.24000017}
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &-8819694022857806693
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8543175668386293549}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 158639473, guid: e725a070cec140c4caffb81624c8c787, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _stateAuthorityChangeErrorCorrectionDelta: 0
+  SyncScale: 0
+  SyncParent: 0
+  _autoAOIOverride: 1
+  DisableSharedModeInterpolation: 0

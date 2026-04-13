@@ -4,16 +4,19 @@ using Fusion;
 public class Coin : NetworkBehaviour
 {
     [SerializeField] private int value = 10;
+    [SerializeField] private string itemId = "coin";
 
     [Header("ROTATE")]
     [SerializeField] private float rotateSpeed = 180f;
 
     private bool collected = false;
 
-    void Update()
+    public override void FixedUpdateNetwork()
     {
-        // 🔥 TẤT CẢ CLIENT đều chạy → ai cũng thấy xoay
-        transform.Rotate(Vector3.up * rotateSpeed * Time.deltaTime, Space.World);
+        // 🔥 CHỈ SERVER xoay
+        if (!Object.HasStateAuthority) return;
+
+        transform.Rotate(Vector3.up * rotateSpeed * Runner.DeltaTime, Space.World);
     }
 
     private void OnTriggerEnter(Collider other)
@@ -26,6 +29,7 @@ public class Coin : NetworkBehaviour
 
         collected = true;
 
+        player.RPC_AddItem(itemId);
         player.RPC_AddScore(value);
 
         Runner.Despawn(Object);

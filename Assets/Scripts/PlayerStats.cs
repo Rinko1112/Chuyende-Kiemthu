@@ -5,11 +5,11 @@ using System.Collections.Generic;
 
 public class PlayerStats : NetworkBehaviour
 {
+    private int lastHurtIndex = -1;
     [Networked] public int HP { get; set; }
     [Networked] public float Speed { get; set; }
     [Networked] public float Stamina { get; set; }
 
-    // 🔥 SCORE
     [Networked] public int Score { get; set; }
 
     public static List<PlayerRef> DeadPlayers = new List<PlayerRef>();
@@ -18,6 +18,8 @@ public class PlayerStats : NetworkBehaviour
     public float maxStamina = 100f;
     public float staminaDrainPerSecond = 15f;
     public float staminaRegenPerSecond = 10f;
+    [SerializeField] private float normalRegenRate = 2f;   // đứng (chậm)
+[SerializeField] private float sittingRegenRate = 10f; // ngồi (nhanh)
 
     private float baseSpeed = 4f;
     private float runBonus = 4f;
@@ -25,25 +27,24 @@ public class PlayerStats : NetworkBehaviour
     private Animator animator;
     private PlayerController controller;
 
-    private bool isDead = false;
+    [Networked] private NetworkBool isDead { get; set; }
     private bool isRunning = false;
     private bool isExhausted = false;
 
-    // ===== HURT EFFECT =====
     [Header("HURT EFFECT")]
+    [Header("HURT SOUND")]
+[SerializeField] private AudioSource hurtAudioSource;
+[SerializeField] private AudioClip[] hurtSounds; // kéo 5 sound vào đây
     [SerializeField] private float hurtFlashDuration = 0.2f;
 
     private Renderer[] renderers;
     private MaterialPropertyBlock mpb;
 
-    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
-    void RPC_SetDead(string data)
-    {
-        if (PlayerListManager.Instance != null)
-        {
-            PlayerListManager.Instance.SetFullData(data);
-        }
-    }
+    // 🔥 HEAL EFFECT
+    [Header("HEAL EFFECT")]
+    [SerializeField] private GameObject healAuraPrefab;
+    private GameObject healAuraInstance;
+    private float lastHealTime;
 
     public override void Spawned()
     {
@@ -58,14 +59,12 @@ public class PlayerStats : NetworkBehaviour
             HP = 100;
             Speed = baseSpeed;
             Stamina = maxStamina;
-
-            Score = 0; // 🔥 reset score
+            Score = 0;
         }
 
         isDead = false;
         isRunning = false;
         isExhausted = false;
-        
     }
 
     public override void FixedUpdateNetwork()
@@ -87,7 +86,11 @@ public class PlayerStats : NetworkBehaviour
         {
             if (Stamina < maxStamina)
             {
-                Stamina += staminaRegenPerSecond * Runner.DeltaTime;
+                float regen = staminaRegenPerSecond;
+
+regen = isSitting ? sittingRegenRate : normalRegenRate;
+
+Stamina += regen * Runner.DeltaTime;
 
                 if (Stamina >= maxStamina)
                 {
@@ -96,6 +99,16 @@ public class PlayerStats : NetworkBehaviour
                 }
             }
         }
+    }
+
+    void Update()
+    {
+        // 🔥 tắt aura nếu không còn heal sau 1s
+        if (healAuraInstance != null && Time.time - lastHealTime > 0.5f)
+        {
+            Destroy(healAuraInstance);
+        }
+
     }
 
     public void StartRunning()
@@ -119,14 +132,11 @@ public class PlayerStats : NetworkBehaviour
     public bool IsRunning() => isRunning;
     public bool IsExhausted() => isExhausted;
 
-    // ===== SCORE =====
     public void AddScore(int amount)
     {
-
         Score += amount;
     }
 
-    // ===== DAMAGE =====
     [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
     public void RPC_TakeDamage(int amount)
     {
@@ -154,9 +164,27 @@ public class PlayerStats : NetworkBehaviour
     void RPC_PlayHurt()
     {
         if (animator != null)
-            animator.SetTrigger("Hurt");
+    animator.SetTrigger("Hurt");
 
-        StartCoroutine(HurtFlash());
+if (Object.HasInputAuthority)
+{
+    if (hurtAudioSource != null && hurtSounds != null && hurtSounds.Length > 0)
+    {
+        int index = UnityEngine.Random.Range(0, hurtSounds.Length);
+
+        // 🔥 tránh trùng sound liên tiếp
+        if (hurtSounds.Length > 1 && index == lastHurtIndex)
+        {
+            index = (index + 1) % hurtSounds.Length;
+        }
+
+        lastHurtIndex = index;
+
+        hurtAudioSource.PlayOneShot(hurtSounds[index]);
+    }
+}
+
+StartCoroutine(HurtFlash());
     }
 
     System.Collections.IEnumerator HurtFlash()
@@ -208,7 +236,6 @@ public class PlayerStats : NetworkBehaviour
             int id = Object.InputAuthority.PlayerId;
 
             PlayerListManager.Instance.SetDead(id, true);
-
             RPC_SetDead(PlayerListManager.Instance.GetRawData());
         }
 
@@ -220,54 +247,144 @@ public class PlayerStats : NetworkBehaviour
 
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
     void RPC_PlayDie()
-    {
-        if (animator != null)
-            animator.SetTrigger("Die");
-    }
-
-    void DespawnPlayer()
-    {
-        if (Object.HasStateAuthority)
-        {
-            Runner.Despawn(Object);
-        }
-    }
-    [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-public void RPC_AddScore(int amount)
 {
-    Score += amount;
-}
-[Rpc(RpcSources.StateAuthority, RpcTargets.All)]
-public void RPC_Revive(Vector3 pos)
-{
-    isDead = false;
-
-    HP = 100;
-    Stamina = maxStamina;
+    if (animator != null)
+        animator.SetTrigger("Die");
 
     if (controller != null)
+        controller.SetDead(true); // 🔥 THÊM DÒNG NÀY
+}
+
+    [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+    public void RPC_AddScore(int amount)
     {
-        controller.SetDead(false);
+        Score += amount;
     }
 
-    transform.position = pos;
-
-    if (animator != null)
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    public void RPC_Revive(Vector3 pos)
     {
-        animator.Rebind();
-        animator.Update(0f);
+        isDead = false;
+
+        HP = 100;
+        Stamina = maxStamina;
+
+        if (controller != null)
+        {
+            controller.SetDead(false);
+        }
+
+        transform.position = pos;
+
+        if (animator != null)
+        {
+            animator.Rebind();
+            animator.Update(0f);
+        }
+    }
+
+    public void Revive(Vector3 pos)
+    {
+        if (!Object.HasStateAuthority) return;
+
+        RPC_Revive(pos);
+
+        int id = Object.InputAuthority.PlayerId;
+
+        PlayerListManager.Instance.SetDead(id, false);
+        RPC_SetDead(PlayerListManager.Instance.GetRawData());
+    }
+
+    // 🔥 HEAL + AURA
+    [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+    public void RPC_AddHeal(float amount)
+    {
+        if (HP <= 0) return;
+
+        HP += Mathf.RoundToInt(amount);
+
+        if (HP > 100)
+            HP = 100;
+
+        RPC_PlayHealEffect();
+    }
+
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    void RPC_PlayHealEffect()
+    {
+        lastHealTime = Time.time;
+
+        if (healAuraPrefab == null) return;
+
+        if (healAuraInstance == null)
+        {
+            healAuraInstance = Instantiate(healAuraPrefab, transform);
+            healAuraInstance.transform.localPosition = Vector3.zero;
+        }
+    }
+
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    void RPC_SetDead(string data)
+    {
+        if (PlayerListManager.Instance != null)
+        {
+            PlayerListManager.Instance.SetFullData(data);
+        }
+    }
+    // ===== INVENTORY SYSTEM =====
+[Networked, Capacity(10)]
+private NetworkArray<NetworkString<_16>> Inventory => default;
+
+// ===== ADD ITEM =====
+[Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+public void RPC_AddItem(string itemId)
+{
+    for (int i = 0; i < Inventory.Length; i++)
+    {
+        if (string.IsNullOrEmpty(Inventory[i].ToString()))
+        {
+            Inventory.Set(i, itemId);
+            return;
+        }
     }
 }
-public void Revive(Vector3 pos)
+
+// ===== GET INVENTORY =====
+public string[] GetInventory()
 {
-    if (!Object.HasStateAuthority) return;
+    string[] items = new string[Inventory.Length];
 
-    RPC_Revive(pos);
+    for (int i = 0; i < Inventory.Length; i++)
+    {
+        items[i] = Inventory[i].ToString();
+    }
 
-    int id = Object.InputAuthority.PlayerId;
+    return items;
+}
+// ===== REMOVE ITEM =====
+[Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+public void RPC_RequestRemoveItem(string itemId)
+{
+    for (int i = 0; i < Inventory.Length; i++)
+    {
+        if (Inventory[i].ToString() == itemId)
+        {
+            Inventory.Set(i, "");
+            return;
+        }
+    }
+}
 
-    PlayerListManager.Instance.SetDead(id, false);
-    RPC_SetDead(PlayerListManager.Instance.GetRawData());
+// ===== SET SLOT (dùng nội bộ) =====
+public void SetInventorySlot(int index, string value)
+{
+    Inventory.Set(index, value);
+}
+private bool isSitting = false;
+[SerializeField] private float sittingRegenMultiplier = 2.5f;
+public void SetSitting(bool value)
+{
+    isSitting = value;
 }
 
 }

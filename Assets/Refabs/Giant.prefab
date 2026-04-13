@@ -133,7 +133,7 @@ AudioSource:
   m_audioClip: {fileID: 0}
   m_Resource: {fileID: 0}
   m_PlayOnAwake: 0
-  m_Volume: 1
+  m_Volume: 0.355
   m_Pitch: 1
   Loop: 0
   Mute: 0
@@ -237,6 +237,9 @@ MonoBehaviour:
   attackRange: 2.5
   walkSpeed: 3
   runSpeed: 5
+  damage: 30
+  attackCooldown: 1.5
+  attackDelay: 1.2
   audioSource: {fileID: 2223873816501949686}
   howlSound: {fileID: 8300000, guid: 0221426a1106b094586cf0f17afe33f2, type: 3}
   footstepSound: {fileID: 8300000, guid: 8b719c99c29823a45accf5a81cd4c42b, type: 3}

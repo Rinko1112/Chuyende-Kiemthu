@@ -5,6 +5,8 @@ TagManager:
   serializedVersion: 3
   tags:
   - Enemy
+  - Thung
+  - Ground
   layers:
   - Default
   - TransparentFX
@@ -16,12 +18,12 @@ TagManager:
   - 
   - Pushable
   - 
+  - Ground
   - 
   - 
   - 
   - 
-  - 
-  - 
+  - Obstacle
   - 
   - 
   - 

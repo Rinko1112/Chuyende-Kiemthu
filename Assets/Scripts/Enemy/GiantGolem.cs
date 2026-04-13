@@ -20,7 +20,7 @@ public class GiantGolem : NetworkBehaviour
     [Header("COMBAT")]
     [SerializeField] private int damage = 30;
     [SerializeField] private float attackCooldown = 1.5f;
-    [SerializeField] private float attackDelay = 1.2f; // 🔥 đúng yêu cầu
+    [SerializeField] private float attackDelay = 0f; // 🔥 đúng yêu cầu
 
     [Header("AUDIO")]
     [SerializeField] private AudioSource audioSource;
@@ -41,7 +41,7 @@ public class GiantGolem : NetworkBehaviour
     private bool hasDealtDamage;
 
     private float howlTimer;
-    private float howlDuration = 1.2f;
+    private float howlDuration = 1f;
 
     private float footstepTimer;
 
@@ -138,7 +138,7 @@ public class GiantGolem : NetworkBehaviour
             return;
         }
 
-        foreach (var p in FindObjectsOfType<PlayerStats>())
+        foreach (var p in FindObjectsByType<PlayerStats>(FindObjectsSortMode.None))
         {
             if (p.HP <= 0) continue;
 

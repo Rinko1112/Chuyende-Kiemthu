@@ -18,7 +18,12 @@ public class GridDebug : MonoBehaviour
     public GameObject wallPrefab;
     public bool taoTuong = true;
 
-    // ===== 🔥 THÊM PHẦN NÀY =====
+    [Header("GROUND LAYER")]
+    [SerializeField] private LayerMask groundLayer;
+
+    [Header("OFFSET CHIỀU CAO")]
+    [SerializeField] private float spawnHeightOffset = 0.3f;
+
     [System.Serializable]
     public class ThungSpawnData
     {
@@ -29,14 +34,41 @@ public class GridDebug : MonoBehaviour
 
     [Header("SPAWN THÙNG")]
     public List<ThungSpawnData> danhSachThung = new List<ThungSpawnData>();
-    // ============================
+
+    // 🔥 CONTAINER
+    private Transform thungContainer;
+    private Transform wallContainer;
+    private Transform gridLineContainer;
 
     private void Awake()
     {
         Instance = this;
     }
 
-    // ===== SNAP =====
+    private void Start()
+    {
+        // 🔥 TẠO CONTAINER
+        thungContainer = TaoContainer("ThungContainer");
+        wallContainer = TaoContainer("WallContainer");
+        gridLineContainer = TaoContainer("GridLineContainer");
+
+        if (hienTrongGame)
+            VeGridRuntime();
+
+        if (taoTuong)
+            TaoTuongBao();
+
+        SpawnThung();
+    }
+
+    Transform TaoContainer(string ten)
+    {
+        GameObject obj = new GameObject(ten);
+        obj.transform.SetParent(transform);
+        return obj.transform;
+    }
+
+    // ================= GRID =================
     public Vector3 SnapToGrid(Vector3 pos)
     {
         float x = Mathf.Floor((pos.x - transform.position.x) / cellSize) * cellSize;
@@ -52,7 +84,6 @@ public class GridDebug : MonoBehaviour
         );
     }
 
-    // 🔥 SNAP THEO Ô CHUẨN TUYỆT ĐỐI (dùng cho spawn)
     public Vector3 GetCellCenter(int x, int z)
     {
         return transform.position + new Vector3(
@@ -62,23 +93,7 @@ public class GridDebug : MonoBehaviour
         );
     }
 
-    // ===== VẼ GRID TRONG GAME =====
-    private void Start()
-    {
-        if (hienTrongGame)
-        {
-            VeGridRuntime();
-        }
-
-        if (taoTuong)
-        {
-            TaoTuongBao();
-        }
-
-        // 🔥 SPAWN THÙNG
-        SpawnThung();
-    }
-
+    // ================= THÙNG =================
     void SpawnThung()
     {
         foreach (var data in danhSachThung)
@@ -86,12 +101,26 @@ public class GridDebug : MonoBehaviour
             if (data.prefab == null) continue;
 
             Vector3 pos = GetCellCenter(data.x, data.z);
-            pos.y = 0.5f; // giữ đúng chiều cao thùng
 
-            Instantiate(data.prefab, pos, Quaternion.identity, transform);
+            RaycastHit hit;
+            if (Physics.Raycast(pos + Vector3.up * 10f, Vector3.down, out hit, 50f, groundLayer))
+                pos.y = hit.point.y;
+            else
+                pos.y = transform.position.y;
+
+            var col = data.prefab.GetComponentInChildren<Collider>();
+            if (col != null)
+                pos.y += col.bounds.extents.y;
+
+            pos.y += spawnHeightOffset;
+
+            GameObject obj = Instantiate(data.prefab, pos, Quaternion.identity, thungContainer);
+
+            obj.transform.position = SnapToGrid(obj.transform.position);
         }
     }
 
+    // ================= GRID LINE =================
     void VeGridRuntime()
     {
         for (int x = 0; x <= width; x++)
@@ -114,6 +143,8 @@ public class GridDebug : MonoBehaviour
     void TaoLine(Vector3 start, Vector3 end)
     {
         GameObject lineObj = new GameObject("GridLine");
+        lineObj.transform.SetParent(gridLineContainer); // 🔥 GOM VÀO CONTAINER
+
         LineRenderer lr = lineObj.AddComponent<LineRenderer>();
 
         lr.positionCount = 2;
@@ -127,7 +158,7 @@ public class GridDebug : MonoBehaviour
         lr.useWorldSpace = true;
     }
 
-    // ===== TẠO TƯỜNG BAO =====
+    // ================= TƯỜNG =================
     void TaoTuongBao()
     {
         if (wallPrefab == null) return;
@@ -151,13 +182,42 @@ public class GridDebug : MonoBehaviour
 
     void SpawnWall(int x, int z)
     {
-        Vector3 pos = GetCellCenter(x, z);
-        pos.y = 0.5f;
+        Vector3 pos = transform.position;
 
-        Instantiate(wallPrefab, pos, Quaternion.identity, transform);
+        if (x == -1)
+        {
+            pos.x += 0;
+            pos.z += z * cellSize + cellSize * 0.5f;
+        }
+        else if (x == width)
+        {
+            pos.x += width * cellSize;
+            pos.z += z * cellSize + cellSize * 0.5f;
+        }
+        else if (z == -1)
+        {
+            pos.x += x * cellSize + cellSize * 0.5f;
+            pos.z += 0;
+        }
+        else if (z == height)
+        {
+            pos.x += x * cellSize + cellSize * 0.5f;
+            pos.z += height * cellSize;
+        }
+
+        var col = wallPrefab.GetComponentInChildren<Collider>();
+        float yOffset = col != null ? col.bounds.extents.y : 0.5f;
+        pos.y = transform.position.y + yOffset;
+
+        Quaternion rot = Quaternion.identity;
+
+        if (x == -1 || x == width)
+            rot = Quaternion.Euler(0, 90f, 0);
+
+        Instantiate(wallPrefab, pos, rot, wallContainer);
     }
 
-    // ===== GIZMOS =====
+    // ================= GIZMOS =================
     void OnDrawGizmos()
     {
         Gizmos.color = Color.green;
